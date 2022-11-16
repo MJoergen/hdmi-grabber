@@ -11,3 +11,5 @@ Digilent has a demo project here (branch: 20/HDMI/master):
 Resources:
 Vivado 2022.1
 
+Input clock (on pin K17) is 125 MHz, and is delivered by the Ethernet PHY.
+

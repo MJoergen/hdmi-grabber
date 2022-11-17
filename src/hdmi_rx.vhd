@@ -4,8 +4,12 @@ use ieee.std_logic_1164.all;
 library unisim;
 use unisim.vcomponents.all;
 
+-- This block handles the low-level I/O SERDES of the TMDS signal.
+-- The output is synchronous and contains the encoded symbol stream.
+
 entity hdmi_rx is
    port (
+      delay_clk_i   : in  std_logic;   -- 200 MHz
       pad_rx_clk_i  : in  std_logic;
       pad_rx_dat_i  : in  std_logic_vector(2 downto 0);
       hdmi_rx_clk_o : out std_logic;
@@ -15,195 +19,95 @@ end entity hdmi_rx;
 
 architecture synthesis of hdmi_rx is
 
-   signal clk_pixel_raw    : std_logic;
-   signal clk_pixel_x1_raw : std_logic;
-   signal clk_pixel_x5_raw : std_logic;
-   signal clk_pixel        : std_logic;
-   signal clk_pixel_x1     : std_logic;
-   signal clk_pixel_x5     : std_logic;
-   signal clkfb_2          : std_logic;
-   signal locked           : std_logic;
+   signal tmds_clk_unbuf   : std_logic;
+   signal tmds_clk         : std_logic;
+   signal hdmi_clk_unbuf   : std_logic;
+   signal hdmi_clk         : std_logic;
+   signal mmcm_clk_unbuf   : std_logic;
+   signal mmcm_clk         : std_logic;
 
    signal delayed          : std_logic := '0';
    signal shift1           : std_logic := '0';
    signal shift2           : std_logic := '0';
    signal clkb             : std_logic := '1';
+
    attribute IODELAY_GROUP : string;
    attribute IODELAY_GROUP of IDELAYE2_inst: label is "idelay_group";
 
 begin
 
-   --------------------------------
-   -- MMCM driven by the HDMI clock
-   --------------------------------
+   ------------------------------
+   -- Input Delay reference
+   --
+   -- These are tied to the delay instances··
+   -- by the IODELAY_GROUP attribute.
+   --------------------------------------------····
+   idelayctrl_inst : IDELAYCTRL
+      port map (
+         RDY    => open,
+         REFCLK => delay_clk_i,
+         RST    => '0'
+      ); -- IDELAYCTRL_inst
+
+
+   -----------------------------------
+   -- MMCM driven by the pad rx clock
+   -----------------------------------
 
    mmcm_rx_clk_inst : MMCME2_BASE
       generic map (
-         BANDWIDTH        => "OPTIMIZED", -- Jitter programming (OPTIMIZED, HIGH, LOW)
-         DIVCLK_DIVIDE    => 1,           -- Master division value (1-106)
-         CLKFBOUT_MULT_F  => 5.0,         -- Multiply value for all CLKOUT (2.000-64.000).
-         CLKIN1_PERIOD    => 12.5,        -- 1000.0/148.5, -- Input clock period in ns to ps resolution (i.e. 33.333 is 30 MHz).
-         CLKOUT0_DIVIDE_F => 5.0,         -- Divide amount for CLKOUT0 (1.000-128.000).
-         CLKOUT1_DIVIDE   => 5,
-         CLKOUT2_DIVIDE   => 1,
+         BANDWIDTH        => "OPTIMIZED",
+         CLKFBOUT_MULT_F  => 10.0,
+         CLKIN1_PERIOD    => 13.468,      -- 74.25 MHz
+         CLKOUT0_DIVIDE_F => 2.0,         -- 371.25 MHz
+         CLKOUT1_DIVIDE   => 10,          -- 74.25 MHz
+         DIVCLK_DIVIDE    => 1,
          REF_JITTER1      => 0.0,         -- Reference input jitter in UI (0.000-0.999).
          STARTUP_WAIT     => FALSE        -- Delays DONE until MMCM is locked (FALSE, TRUE)
       )
       port map (
-         CLKIN1    => pad_rx_clk_i,     -- 1-bit input: Clock
-         CLKOUT0   => clk_pixel_raw,    -- 1-bit output: CLKOUT0
-         CLKOUT1   => clk_pixel_x1_raw, -- 1-bit output: CLKOUT1
-         CLKOUT2   => clk_pixel_x5_raw, -- 1-bit output: CLKOUT2
-         CLKFBOUT  => clkfb_2,       -- 1-bit output: Feedback clock
-         LOCKED    => locked,        -- 1-bit output: LOCK
-         PWRDWN    => '0',           -- 1-bit input: Power-down
-         RST       => '0',           -- 1-bit input: Reset
-         CLKFBIN   => clkfb_2        -- 1-bit input: Feedback clock
-      );
+         CLKIN1    => pad_rx_clk_i,
+         CLKOUT0   => tmds_clk_unbuf,
+         CLKOUT1   => hdmi_clk_unbuf,
+         CLKFBOUT  => mmcm_clk_unbuf,
+         PWRDWN    => '0',
+         RST       => '0',
+         CLKFBIN   => mmcm_clk
+      ); -- mmcm_rx_clk_inst : MMCME2_BASE
 
-      ----------------------------------
-      -- Force the highest speed clock
-      -- through the IO clock buffer
-      -- (this is only rated for 600MHz!)
-      -----------------------------------
-   BUFIO_x5_inst : BUFIO
+
+   -------------------------------------------------------------------------------------
+   -- Clock buffers
+   -------------------------------------------------------------------------------------
+
+   bufg_tmds_inst : BUFG
       port map (
-         I => clk_pixel_x5_raw, -- 1-bit input: Clock input (connect to an IBUF or BUFMR).
-         O => clk_pixel_x5      -- 1-bit output: Clock output (connect to I/O clock loads).
-      );
+         I => tmds_clk_unbuf,
+         O => tmds_clk
+      ); -- bufg_tmds_inst
 
-   BUFIO_x1_inst : BUFG
+   bufg_hdmi_inst : BUFG
+      port map (
+         I => hdmi_clk_unbuf,
+         O => hdmi_clk
+      ); -- bufg_hdmi_inst
+
+   bufg_mmcm_inst : BUFG
+      port map (
+         I => mmcm_clk_unbuf,
+         O => mmcm_clk
+      ); -- bufg_mmcm_inst
+
+
+   gen_tmds_io : for i in 0 to 2 generate
+      i_tmds_io : entity work.tmds_io
          port map (
-            I => clk_pixel_x1_raw, -- 1-bit input: Clock input (connect to an IBUF or BUFMR).
-            O => clk_pixel_x1      -- 1-bit output: Clock output (connect to I/O clock loads).
-         );
-
-   BUFIO_inst : BUFG
-         port map (
-            I => clk_pixel_raw, -- 1-bit input: Clock input (connect to an IBUF or BUFMR).
-            O => clk_pixel      -- 1-bit output: Clock output (connect to I/O clock loads).
-         );
-
-   IDELAYE2_inst : IDELAYE2
-       generic map (
-             CINVCTRL_SEL          => "FALSE",
-             DELAY_SRC             => "DATAIN",
-             HIGH_PERFORMANCE_MODE => "TRUE",
-             IDELAY_TYPE           => "VAR_LOAD",
-             IDELAY_VALUE          => 0,
-             PIPE_SEL              => "FALSE",
-             REFCLK_FREQUENCY      => 200.0,
-             SIGNAL_PATTERN        => "DATA"
-       )
-       port map (
-             DATAIN      => serial,
-             IDATAIN     => '0',
-             DATAOUT     => delayed,
-             --
-             CNTVALUEOUT => open,
-             C           => clk,
-             CE          => delay_ce,
-             CINVCTRL    => '0',
-             CNTVALUEIN  => delay_count,
-             INC         => '0',
-             LD          => '1',
-             LDPIPEEN    => '0',
-             REGRST      => '0'
-       );
-       clkb <= not clk_x5;
-
-   ISERDESE2_master : ISERDESE2
-      generic map (
-         DATA_RATE         => "DDR",
-         DATA_WIDTH        => 10,
-         DYN_CLKDIV_INV_EN => "FALSE",
-         DYN_CLK_INV_EN    => "FALSE",
-         INIT_Q1           => '0',
-         INIT_Q2           => '0',
-         INIT_Q3           => '0',
-         INIT_Q4           => '0',
-         INTERFACE_TYPE    => "NETWORKING",
-         IOBDELAY          => "IFD",
-         NUM_CE            => 1,
-         OFB_USED          => "FALSE",
-         SERDES_MODE       => "MASTER",
-         SRVAL_Q1          => '0',
-         SRVAL_Q2          => '0',
-         SRVAL_Q3          => '0',
-         SRVAL_Q4          => '0'
-      )
-      port map (
-         O            => open,
-         Q1           => data(9),
-         Q2           => data(8),
-         Q3           => data(7),
-         Q4           => data(6),
-         Q5           => data(5),
-         Q6           => data(4),
-         Q7           => data(3),
-         Q8           => data(2),
-         SHIFTOUT1    => shift1,
-         SHIFTOUT2    => shift2,
-         BITSLIP      => bitslip,
-         CE1          => ce,
-         CE2          => '1',
-         CLKDIVP      => '0',
-         CLK          => clk_x5,
-         CLKB         => clkb,
-         CLKDIV       => clk_x1,
-         OCLK         => '0',
-         DYNCLKDIVSEL => '0',
-         DYNCLKSEL    => '0',
-         D            => '0',
-         DDLY         => delayed,
-         OFB          => '0',
-         OCLKB        => '0',
-         RST          => reset,
-         SHIFTIN1     => '0',
-         SHIFTIN2     => '0'
-      ); -- ISERDESE2_master
-
-   ISERDESE2_slave : ISERDESE2
-      generic map (
-         DATA_RATE         => "DDR",
-         DATA_WIDTH        => 10,
-         DYN_CLKDIV_INV_EN => "FALSE",
-         DYN_CLK_INV_EN    => "FALSE",
-         INIT_Q1           => '0',
-         INIT_Q2           => '0',
-         INIT_Q3           => '0',
-         INIT_Q4           => '0',
-         INTERFACE_TYPE    => "NETWORKING",
-         IOBDELAY          => "IFD",
-         NUM_CE            => 1,
-         OFB_USED          => "FALSE",
-         SERDES_MODE       => "SLAVE",
-         SRVAL_Q1          => '0',
-         SRVAL_Q2          => '0',
-         SRVAL_Q3          => '0',
-         SRVAL_Q4          => '0'
-      )
-      port map (
-         Q3           => data(1),
-         Q4           => data(0),
-         BITSLIP      => bitslip,
-         CE1          => ce,
-         CE2          => '1',
-         CLKDIVP      => '0',
-         CLK          => CLK_x5,
-         CLKB         => clkb,
-         CLKDIV       => clk_x1,
-         OCLK         => '0',
-         DYNCLKDIVSEL => '0',
-         DYNCLKSEL    => '0',
-         D            => '0',
-         DDLY         => '0',
-         OFB          => '0',
-         OCLKB        => '0',
-         RST          => reset,
-         SHIFTIN1     => shift1,
-         SHIFTIN2     => shift2
-      ); -- ISERDESE2_slave : ISERDESE2
+            delay_clk_i   => delay_clk,
+            hdmi_rx_clk_i => hdmi_rx_clk,
+            pad_rx_dat_i  => pad_rx_dat_i(i),
+            hdmi_rx_dat_o => hdmi_rx_dat_o(10*i+9 downto 10*i)
+         ); -- i_tmds_io
+      end generate gen_tmds_io;
 
 end architecture synthesis;
 

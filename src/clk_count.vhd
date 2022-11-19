@@ -7,8 +7,8 @@ use xpm.vcomponents.all;
 
 entity clk_count is
    generic (
-      G_COUNTER_SIZE         : integer := 28,
-      G_INPUT_CLOCK_SPPED_HZ : integer := 200_000_000
+      G_COUNTER_SIZE         : integer := 28;
+      G_INPUT_CLOCK_SPEED_HZ : integer := 200_000_000
    );
    port (
       clk_i     : in  std_logic;
@@ -37,7 +37,7 @@ begin
    clk_counter_p : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if clk_counter = G_INPUT_CLOCK_SPPED_HZ - 1 then
+         if clk_counter = G_INPUT_CLOCK_SPEED_HZ - 1 then
             clk_counter <= (others => '0');
             clk_pps     <= '1';
          else

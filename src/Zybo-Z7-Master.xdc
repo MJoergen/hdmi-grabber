@@ -10,11 +10,9 @@
 create_clock -add -name sys_clk_pin -period 8.00 [get_ports sysclk]
 create_clock -add -name hdmi_clk -period 13.468 [get_ports hdmi_rx_clk_p]
 
-# group data channel IODELAYE2 cells with the IDELAYCTRL
-set_property IODELAY_GROUP iodelay_grp [get_cells hdmi_rx_inst/gen_channel_rx[*].channel_rx_inst/IDELAYE2_inst]
-set_property IODELAY_GROUP iodelay_grp [get_cells hdmi_rx_inst/idelayctrl_inst]
-
 ## PLACEMENT CONSTRAINTS
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets hdmi_input_inst/clk_pixel_x5_raw]
+#set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets hdmi_input_inst/clk_pixel_x5_raw]
 
 #Clock signal
 set_property -dict { PACKAGE_PIN K17   IOSTANDARD LVCMOS33 } [get_ports { sysclk }]; #IO_L12P_T1_MRCC_35 Sch=sysclk

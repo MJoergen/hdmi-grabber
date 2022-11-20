@@ -4,14 +4,20 @@
 ## - uncomment the lines corresponding to used pins
 ## - rename the used ports (in each line, after get_ports) according to the top level signal names in the project
 
-#Clock signal
-set_property -dict { PACKAGE_PIN K17   IOSTANDARD LVCMOS33 } [get_ports { sysclk }]; #IO_L12P_T1_MRCC_35 Sch=sysclk
-create_clock -add -name sys_clk_pin -period 8.00 [get_ports { sysclk }];
+## TIMING CONSTRAINTS
 
-# HDMI Rx clock
+# Clocks
+create_clock -add -name sys_clk_pin -period 8.00 [get_ports sysclk]
 create_clock -add -name hdmi_clk -period 13.468 [get_ports hdmi_rx_clk_p]
 
+# group data channel IODELAYE2 cells with the IDELAYCTRL
+set_property IODELAY_GROUP iodelay_grp [get_cells hdmi_rx_inst/gen_channel_rx[*].channel_rx_inst/IDELAYE2_inst]
+set_property IODELAY_GROUP iodelay_grp [get_cells hdmi_rx_inst/idelayctrl_inst]
 
+## PLACEMENT CONSTRAINTS
+
+#Clock signal
+set_property -dict { PACKAGE_PIN K17   IOSTANDARD LVCMOS33 } [get_ports { sysclk }]; #IO_L12P_T1_MRCC_35 Sch=sysclk
 
 ##Switches
 #set_property -dict { PACKAGE_PIN G15   IOSTANDARD LVCMOS33 } [get_ports { sw[0] }]; #IO_L19N_T3_VREF_35 Sch=sw[0]

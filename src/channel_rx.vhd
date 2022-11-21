@@ -63,7 +63,7 @@ begin
          IDELAY_TYPE           => "VAR_LOAD",
          IDELAY_VALUE          => 0,
          PIPE_SEL              => "FALSE",
-         REFCLK_FREQUENCY      => 200.0,
+         REFCLK_FREQUENCY      => 200.0,  -- Tap resolution of 1000000/(64*200) = 78.125  ps.
          SIGNAL_PATTERN        => "DATA"
       )
       port map (

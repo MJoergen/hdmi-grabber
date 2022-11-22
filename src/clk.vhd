@@ -22,9 +22,8 @@ end entity clk;
 architecture synthesis of clk is
 
    signal tmds_clk_unbuf : std_logic;
-   signal hdmi_clk_unbuf : std_logic;
    signal mmcm_clk_unbuf : std_logic;
-   signal mmcm_clk       : std_logic;
+   signal mmcm_locked    : std_logic;
 
    signal delay_clk_unbuf      : std_logic;
    signal delay_mmcm_clk_unbuf : std_logic;
@@ -42,19 +41,18 @@ begin
          CLKFBOUT_MULT_F  => 10.0,
          CLKIN1_PERIOD    => 13.468,      -- 74.25 MHz
          CLKOUT0_DIVIDE_F => 2.0,         -- 371.25 MHz
-         CLKOUT1_DIVIDE   => 10,          -- 74.25 MHz
          DIVCLK_DIVIDE    => 1,
          REF_JITTER1      => 0.0,
          STARTUP_WAIT     => FALSE        -- Delays DONE until MMCM is locked (FALSE, TRUE)
       )
       port map (
-         CLKFBIN   => mmcm_clk,
+         CLKFBIN   => mmcm_clk_unbuf,
          CLKFBOUT  => mmcm_clk_unbuf,
          CLKIN1    => hdmi_pad_clk_i,
          CLKOUT0   => tmds_clk_unbuf,
-         CLKOUT1   => hdmi_clk_unbuf,
          PWRDWN    => '0',
-         RST       => '0'
+         RST       => '0',
+         LOCKED    => mmcm_locked
       ); -- mmcm_rx_clk_inst : MMCME2_BASE
 
 
@@ -86,22 +84,22 @@ begin
    -- Clock buffers
    -------------------------------------------------------------------------------------
 
-   bufg_mmcm_inst : BUFG
-      port map (
-         I => mmcm_clk_unbuf,
-         O => mmcm_clk
-      ); -- bufg_mmcm_inst
-
-   bufg_tmds_inst : BUFG
+   bufg_tmds_inst : BUFIO
       port map (
          I => tmds_clk_unbuf,
          O => tmds_clk_o
       ); -- bufg_tmds_inst
 
-   bufg_hdmi_inst : BUFG
+   bufg_hdmi_inst : BUFR
+      generic map (
+         BUFR_DIVIDE => "5",   -- Values: "BYPASS, 1, 2, 3, 4, 5, 6, 7, 8"·
+         SIM_DEVICE => "7SERIES"  -- Must be set to "7SERIES"·
+      )
       port map (
-         I => hdmi_clk_unbuf,
-         O => hdmi_clk_o
+         CE  => '1',
+         CLR => not mmcm_locked,
+         I   => tmds_clk_unbuf,
+         O   => hdmi_clk_o
       ); -- bufg_hdmi_inst
 
 

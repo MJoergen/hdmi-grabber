@@ -30,6 +30,11 @@ begin
    -----------------------------------
 
    ibufds_clk_inst : ibufds
+      generic map (
+         DIFF_TERM    => FALSE,  -- Differential Termination·
+         IBUF_LOW_PWR => TRUE,   -- Low power (TRUE) vs. performance (FALSE) setting for referenced I/O standards
+         IOSTANDARD   => "TMDS_33"
+      )
       port map (
          i  => hdmi_rx_clk_p,
          ib => hdmi_rx_clk_n,
@@ -38,6 +43,10 @@ begin
 
    ibufds_gen : for i in 0 to 2 generate
       ibufds_dat_inst : ibufds
+         generic map (
+            DIFF_TERM  => FALSE,
+            IOSTANDARD => "TMDS_33"
+         )
          port map (
             i  => hdmi_rx_p(i),
             ib => hdmi_rx_n(i),

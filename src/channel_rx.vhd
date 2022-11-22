@@ -58,7 +58,7 @@ begin
    IDELAYE2_inst : IDELAYE2
       generic map (
          CINVCTRL_SEL          => "FALSE",
-         DELAY_SRC             => "DATAIN",
+         DELAY_SRC             => "IDATAIN",
          HIGH_PERFORMANCE_MODE => "TRUE",
          IDELAY_TYPE           => "VAR_LOAD",
          IDELAY_VALUE          => 0,
@@ -72,9 +72,9 @@ begin
          CINVCTRL    => '0',              -- input
          CNTVALUEIN  => hdmi_delay_count, -- input
          CNTVALUEOUT => open,             -- output
-         DATAIN      => pad_dat_i,        -- input
+         DATAIN      => '0',              -- input
          DATAOUT     => delay_dat,        -- output
-         IDATAIN     => '0',              -- input
+         IDATAIN     => pad_dat_i,        -- input
          INC         => '0',              -- input
          LD          => hdmi_delay_ce,    -- input
          LDPIPEEN    => '0',              -- input
